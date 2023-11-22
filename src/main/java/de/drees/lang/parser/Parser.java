@@ -2,14 +2,8 @@ package de.drees.lang.parser;
 
 import de.drees.lang.exceptions.CarlangException;
 import de.drees.lang.exceptions.CarlangInvalidSyntaxError;
-import de.drees.lang.lexer.Lexer;
-import de.drees.lang.lexer.Token;
-import de.drees.lang.lexer.TokenList;
-import de.drees.lang.lexer.TokenType;
-import de.drees.lang.parser.nodes.BinaryOperationNode;
-import de.drees.lang.parser.nodes.ISyntaxNode;
-import de.drees.lang.parser.nodes.NumberNode;
-import de.drees.lang.parser.nodes.UnaryOperationNode;
+import de.drees.lang.lexer.*;
+import de.drees.lang.parser.nodes.*;
 import lombok.Getter;
 
 import java.util.ArrayList;
@@ -52,13 +46,20 @@ public class Parser {
         Token token = this.currentToken;
 
         if(token.getType() == TokenType.DOUBLE || token.getType() == TokenType.INTEGER) {
+            result.registerAdvancement();
             this.advance();
             return result.success(new NumberNode(token));
+        } else if (token.getType() == TokenType.IDENTIFIER) {
+            result.registerAdvancement();
+            this.advance();
+            return result.success(new VariableAccessNode(token));
         } else if(token.getType() == TokenType.LPAREN) {
+            result.registerAdvancement();
             this.advance();
             ISyntaxNode expression = result.register(expression());
             if(result.isError()) return result;
             if(this.currentToken.getType() == TokenType.RPAREN) {
+                result.registerAdvancement();
                 advance();
                 return result.success(expression);
             } else {
@@ -66,7 +67,8 @@ public class Parser {
                         currentToken.getEndPosition(), new char[]{')'}));
             }
         } else {
-            return result.failure(new CarlangInvalidSyntaxError(token.getStartPosition(), token.getEndPosition(), "Expected a number, '+', '-' or '('"));
+            return result.failure(new CarlangInvalidSyntaxError(token.getStartPosition(), token.getEndPosition(),
+                    "Expected an identifier, a number, '+', '-' or '('"));
         }
     }
 
@@ -75,6 +77,7 @@ public class Parser {
         Token token = this.currentToken;
 
         if(token.isExpressionOperator()) {
+            result.registerAdvancement();
             this.advance();
             ISyntaxNode factor = result.register(factor());
             if(result.isError()) return result;
@@ -102,14 +105,23 @@ public class Parser {
 
         if(result.isError()) {
             return result;
+        } else if(left == null) {
+            return result.failure(new CarlangInvalidSyntaxError(
+                    currentToken.getStartPosition(),
+                    currentToken.getEndPosition(), "No left-hand node found"));
         }
 
         while(relevancySupplier.get()) {
             Token operator = this.currentToken;
+            result.registerAdvancement();
             this.advance();
             ISyntaxNode right = result.register(rightNodeSupplier.get());
             if(result.isError()) {
                 return result;
+            }else if(right == null) {
+                return result.failure(new CarlangInvalidSyntaxError(
+                        currentToken.getStartPosition(),
+                        currentToken.getEndPosition(), "No right-hand node found"));
             }
             left = new BinaryOperationNode(left, operator, right);
         }
@@ -120,7 +132,44 @@ public class Parser {
     private ParseResult term() { // / *
         return binaryOperation(this::factor, () -> this.currentToken != null && this.currentToken.isTermOperator());
     }
-    private ParseResult expression() { // + -
-        return binaryOperation(this::term, () -> this.currentToken != null && this.currentToken.isExpressionOperator());
+    private ParseResult expression() { // + - and variable assignments
+        ParseResult result = new ParseResult();
+        if(currentToken.isSpecificKeyword(Keyword.DECLARE)) { // LOOK FOR VARIABLE ASSIGNMENT
+            result.registerAdvancement();
+            this.advance();
+            if(this.currentToken.getType() != TokenType.IDENTIFIER) { // IF ASSIGNMENT NOT FOLLOWED BY IDENTIFIER
+                                                                      // THERE IS SOMETHING WRONG
+                return result.failure(new CarlangInvalidSyntaxError(
+                        this.currentToken.getStartPosition(),
+                        this.currentToken.getEndPosition(),"Expected an identifier after assignment keyword."));
+            }
+            // When this part is reached, variable name has been found out and '=' has to be looked for
+            Token identifier = this.currentToken;
+            result.registerAdvancement();
+            this.advance();
+
+            if(this.currentToken.getType() != TokenType.EQUALS) { // If next token is not '=', there is something wrong
+                return result.failure(new CarlangInvalidSyntaxError(
+                        this.currentToken.getStartPosition(),
+                        this.currentToken.getEndPosition(),"Expected '=' after identifier."));
+            }
+            result.registerAdvancement();
+            this.advance();
+            ISyntaxNode subExpression = result.register(expression());
+
+            if(result.isError()) return result;
+            return result.success(new VariableAssignmentNode(identifier, subExpression));
+        }
+
+        ISyntaxNode node = result.register(binaryOperation(this::term,
+                () -> this.currentToken != null && this.currentToken.isExpressionOperator()));
+
+        if(result.isError()) {
+            return result.failure(new CarlangInvalidSyntaxError(this.currentToken.getStartPosition(),
+                    this.currentToken.getEndPosition(),
+                    "Expected '%s' an identifier, a number, '+', '-' or '('".formatted(Keyword.DECLARE.label)));
+        }
+
+        return result.success(node);
     }
 }

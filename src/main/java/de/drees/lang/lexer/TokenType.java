@@ -11,6 +11,10 @@ public enum TokenType {
     MULTIPLY ("MULTIPLY"), // *
     LPAREN ("L-PAREN"), // (
     RPAREN ("R-PAREN"), // )
+    EQUALS ("EQUALS"), // assign operator
+    KEYWORD ("KEYWORD"), // reserved words in carlang
+    IDENTIFIER ("IDENTIFIER"), //represents variable names (and function names, later)
+
     EOF("EOF")
 
     ;

@@ -13,6 +13,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 
 public class CliMain {
+    static SymbolTable globalScope = new SymbolTable();
     public static void main(String[] args) throws Exception {
         ConsoleUtils.getInstance().printScreenContents();
 
@@ -31,9 +32,11 @@ public class CliMain {
             } else if (line.startsWith(":type-eval:")) {
                 CarlangValue val = handleDefaultInput(line.substring(11));
                 System.out.println(val.typeInfoString());
-            } else {
-                CarlangValue val = handleDefaultInput(line);
+            } else if(line.startsWith(":eval:")){
+                CarlangValue val = handleDefaultInput(line.substring(6));
                 System.out.println(val.toString());
+            } else {
+                handleDefaultInput(line);
             }
         }
     }
@@ -63,6 +66,7 @@ public class CliMain {
             printErrorOnLine(line, result.getError());
         } else {
             CarlangContext programContext = new CarlangContext();
+            programContext.setSymbolTable(globalScope);
             CarlangInterpreter interpreter = new CarlangInterpreter();
             CarlangRuntimeResult res = interpreter.visitNode(result.getNode(), programContext);
 
@@ -87,7 +91,7 @@ public class CliMain {
 
         System.out.println(line);
         System.out.println(" ".repeat(error.getStartPos().getColumnNumber()) +
-                "^".repeat(error.getEndPos().getColumnNumber()));
+                "^".repeat(error.getEndPos().getColumnNumber()-error.getStartPos().getColumnNumber()));
         System.out.println(error.getMessage());
     }
 }

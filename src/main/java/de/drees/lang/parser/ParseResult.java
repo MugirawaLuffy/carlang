@@ -8,10 +8,12 @@ import lombok.Setter;
 
 @Getter @Setter
 public class ParseResult {
+    private int advancements = 0;
     private ISyntaxNode node;
     private CarlangException error = null;
 
     public ISyntaxNode register(ParseResult result) {
+        this.advancements += result.getAdvancements();
         if(isError()) {
             //System.out.println("Got An Error while registering");
             this.error = result.getError();
@@ -19,11 +21,12 @@ public class ParseResult {
         return result.getNode();
     }
 
-
+    public void registerAdvancement() {
+        advancements++;
+    }
 
     public ParseResult failure(CarlangException error) {
-        //System.out.println("Got An Error while parsing: " + error.getMessage());
-        this.error = error;
+        if(this.error == null || advancements == 0) this.error = error;
         return this;
     }
 

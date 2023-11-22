@@ -19,7 +19,7 @@ public class Lexer {
         this.position = new LexerPosition(-1, 0, -1, fileName, text);
     }
 
-    public void advance() {
+    private void advance() {
         try {
             this.position.advance(this.currentCharacter);
             this.currentCharacter = this.text.charAt(this.position.getIndex());
@@ -29,7 +29,7 @@ public class Lexer {
         }
     }
 
-    public Token makeNumber() throws CarlangException {
+    private Token makeNumber() throws CarlangException {
         LexerPosition startOfToken = this.position.copy();
 
         Token returnToken;
@@ -57,6 +57,27 @@ public class Lexer {
         return returnToken;
     }
 
+    private Boolean charIsAllowedVariableCharacter(char c) {
+        if(Character.isLetter(c)) return true;
+        if(Character.isDigit(c)) return true;;
+        return c == '_';
+    }
+
+    private Token makeIdentifier() throws CarlangException {
+        LexerPosition startOfToken = this.position.copy();
+        StringBuilder bufferIdentifier = new StringBuilder();
+
+        while(this.currentCharacter != null && charIsAllowedVariableCharacter(this.currentCharacter)) {
+            bufferIdentifier.append(this.currentCharacter);
+            this.advance();
+        }
+
+        TokenType type = Keyword.identifierIsKeyword(bufferIdentifier.toString()) ?
+                TokenType.KEYWORD : TokenType.IDENTIFIER;
+
+        return new Token(type, bufferIdentifier.toString(), startOfToken, this.position);
+    }
+
     public TokenList tokenize() throws CarlangException {
         ArrayList<Token> tokens = new ArrayList<>();
         this.advance();
@@ -65,8 +86,11 @@ public class Lexer {
             if(this.currentCharacter.equals(' ') || this.currentCharacter.equals('\t')) {
                 advance();
                 continue;
-            }else if(Character.isDigit(this.currentCharacter)) {
+            } else if(Character.isDigit(this.currentCharacter)) {
                 tokens.add(makeNumber());
+                continue;
+            } else if (Character.isLetter(this.currentCharacter)) {
+                tokens.add(makeIdentifier());
                 continue;
             }
 
@@ -94,6 +118,10 @@ public class Lexer {
                 }
                 case '^' -> {
                     tokens.add(new Token(TokenType.POWER, this.position));
+                    this.advance();
+                }
+                case '=' -> {
+                    tokens.add(new Token(TokenType.EQUALS, this.position));
                     this.advance();
                 }
                 case '(' -> {

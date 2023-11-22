@@ -2,6 +2,8 @@ package de.drees.lang.lexer;
 
 import lombok.Getter;
 
+import java.security.Key;
+
 @Getter
 public class Token {
     private Object payload = null;
@@ -59,5 +61,14 @@ public class Token {
 
     public String toStringRepresentation() {
         return payload == null ? type.label : String.format("%s: %s", type.label, payload.toString());
+    }
+
+    public boolean isKeyword() {
+        return Keyword.identifierIsKeyword(this.payload.toString());
+    }
+
+    public boolean isSpecificKeyword(Keyword keyword) {
+        if(payload == null) return false;
+        return this.isKeyword() && this.payload.toString().equals(keyword.label);
     }
 }

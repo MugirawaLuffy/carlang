@@ -2,10 +2,7 @@ package de.drees.lang.interpreter;
 
 import de.drees.lang.exceptions.CarlangRuntimeException;
 import de.drees.lang.lexer.TokenType;
-import de.drees.lang.parser.nodes.BinaryOperationNode;
-import de.drees.lang.parser.nodes.ISyntaxNode;
-import de.drees.lang.parser.nodes.NumberNode;
-import de.drees.lang.parser.nodes.UnaryOperationNode;
+import de.drees.lang.parser.nodes.*;
 
 public class CarlangInterpreter {
 
@@ -16,6 +13,10 @@ public class CarlangInterpreter {
             return visitBinaryOperationNode((BinaryOperationNode) node, context);
         } else if (node instanceof UnaryOperationNode) {
             return visitUnaryOperationNode((UnaryOperationNode) node, context);
+        } else if (node instanceof VariableAssignmentNode) {
+            return visitVariableAssignmentNode((VariableAssignmentNode) node, context);
+        } else if (node instanceof VariableAccessNode) {
+            return visitVariableAccessNode((VariableAccessNode) node, context);
         } else {
             throw new Exception("Unsupported Node, Interpreter ran into an error with node '%s'"
                     .formatted(node.getStringRepresentation()));
@@ -89,5 +90,33 @@ public class CarlangInterpreter {
         }
 
         return result.success(value.setPositions(unaryOperationNode.getStartPosition(), unaryOperationNode.getEndPosition()));
+    }
+
+    private CarlangRuntimeResult visitVariableAssignmentNode(VariableAssignmentNode variableAssignmentNode, CarlangContext context) throws Exception {
+        CarlangRuntimeResult result = new CarlangRuntimeResult();
+        String varName = variableAssignmentNode.getVariableNameString();
+        CarlangValue expressionResult = result.register(visitNode(variableAssignmentNode.getValueNode(), context));
+
+        if(result.isError()) return result;
+
+        context.symbolTable.setSymbol(varName, expressionResult);
+        return result.success(expressionResult);
+    }
+
+    private CarlangRuntimeResult visitVariableAccessNode(VariableAccessNode variableAccessNode, CarlangContext context) {
+        CarlangRuntimeResult result = new CarlangRuntimeResult();
+        String varName = variableAccessNode.getVariableNameString();
+        CarlangValue value = context.getSymbolTable().getSymbolValue(varName);
+
+        if (value == null) {
+            return result.failure(new CarlangRuntimeException(
+                    variableAccessNode.getStartPosition(), variableAccessNode.getEndPosition(),
+                    "Tried to access variable %s, but it has not been defined"
+                            .formatted(varName)
+            ));
+        }
+
+        value.setPositions(variableAccessNode.getStartPosition(), variableAccessNode.getEndPosition());
+        return result.success(value);
     }
 }
